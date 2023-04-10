@@ -1,15 +1,42 @@
-﻿namespace Redirector;
+﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Caching.Memory;
+
+namespace Redirector;
 
 public class RedirectionService
 {
-    public void HandleRedirect(Redirect redirect)
+    private TimeSpan cacheDuration;
+    public IMemoryCache ResponseCache { get; }
+
+    public RedirectionService()
+    {
+        // TODO: Make app setting
+        cacheDuration = TimeSpan.FromMinutes(15);
+        this.ResponseCache = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(30) });
+    }
+
+    public async Task HandleRedirectsAsync(IEnumerable<Redirect> redirects)
     {
         try
         {
-            Console.WriteLine($"Redirecting from {redirect.RedirectUrl} to {redirect.TargetUrl}...");
-            // TODO: Perform redirect
-            // TODO: Cache results
-            // TODO: Create configurable cache
+            using HttpClient client = new HttpClient();
+
+            foreach (var redirect in redirects)
+            {
+                // Try the target url
+                var response = await client.GetAsync(redirect.TargetUrl);
+                var statusCode = ((int)response.StatusCode);
+
+                // Try the redirect url if 300 status code
+                if (statusCode >= 300 && statusCode <= 399)
+                {
+                    response = await client.GetAsync(redirect.RedirectUrl);
+                }
+
+                var timeStamp = DateTime.Now;
+                ResponseCache.Set(DateTime.Now, response, DateTimeOffset.Now + cacheDuration);
+            }
+
             // TODO: Log results
         }
         catch (System.Exception e)
