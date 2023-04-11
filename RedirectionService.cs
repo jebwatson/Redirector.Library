@@ -1,11 +1,13 @@
 ﻿using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
+using NLog;
 
 namespace Redirector;
 
 public class RedirectionService
 {
     private TimeSpan cacheDuration;
+    private Logger logger;
     public IMemoryCache ResponseCache { get; }
 
     public RedirectionService()
@@ -13,6 +15,7 @@ public class RedirectionService
         // TODO: Make app setting
         cacheDuration = TimeSpan.FromMinutes(15);
         this.ResponseCache = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(30) });
+        this.logger = LogManager.GetCurrentClassLogger();
     }
 
     public async Task HandleRedirectsAsync(IEnumerable<Redirect> redirects)
@@ -35,15 +38,16 @@ public class RedirectionService
 
                 var timeStamp = DateTime.Now;
                 ResponseCache.Set(DateTime.Now, response, DateTimeOffset.Now + cacheDuration);
+
+                logger.Info("Successful API call");
             }
 
             // TODO: Log results
         }
         catch (System.Exception e)
         {
-            System.Console.WriteLine($"Error encountered while attempting redirect - {e}");
-
             // Log error
+            logger.Error("Error encountered while calling API - " + e);
         }
     }
 }
